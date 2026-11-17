@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="520" viewBox="0 0 1600 520">
+  <rect width="1600" height="520" rx="28" fill="#10263b"/>
+  <g transform="translate(110 78)" fill="none" stroke="#dfbd76" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="180" cy="180" r="142" stroke-opacity=".45"/>
+    <path d="M180 38v284M38 180h284" stroke-opacity=".22"/>
+    <path d="M180 62L205 155 298 180 205 205 180 298 155 205 62 180 155 155Z" fill="#dfbd76" stroke="#dfbd76"/>
+    <path d="M180 108v144M108 180h144" stroke="#10263b" stroke-width="10"/>
+  </g>
+  <g fill="#dfbd76" font-family="Arial, Helvetica, sans-serif">
+    <text x="390" y="250" font-size="126" font-weight="700" letter-spacing="18">TILLO</text>
+    <text x="915" y="250" font-size="126" font-weight="300" letter-spacing="18">TRAVEL</text>
+    <rect x="402" y="294" width="930" height="2" fill="#dfbd76" opacity=".55"/>
+    <text x="405" y="355" font-size="32" font-weight="400" letter-spacing="12" opacity=".8">EXCLUSIVE JOURNEYS</text>
+  </g>
+</svg>

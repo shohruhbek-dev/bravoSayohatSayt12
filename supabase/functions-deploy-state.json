@@ -1,0 +1,9 @@
+{
+  "projectId": "70829421",
+  "functions": {
+    "notify-telegram-lead": {
+      "hasChanged": false,
+      "hash": "d53075631248d538eb1c7c415998d3daaec5174652210bd420f1d55f31f25bf6"
+    }
+  }
+}
