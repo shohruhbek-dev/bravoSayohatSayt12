@@ -36,6 +36,50 @@ const heroImages = [
   'https://images.pexels.com/photos/13256050/pexels-photo-13256050.jpeg?auto=compress&cs=tinysrgb&w=1800',
 ];
 
+// --- Telegramga to'g'ridan-to'g'ri xabar yuborish ---
+// .env faylingizda quyidagilar bo'lishi kerak (Vite loyihalarida VITE_ prefiksi SHART,
+// aks holda brauzer bu qiymatlarni ko'rmaydi):
+//   VITE_TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+//   VITE_TELEGRAM_CHAT_ID=123456789
+async function sendTelegramLead(formData: {
+  phone: string;
+  destination: string;
+  departureDate: string;
+  adults: number;
+  children: number;
+}) {
+  const botToken = import.meta.env.VITE_TELEGRAM_BOT_TOKEN as string | undefined;
+  const chatId = import.meta.env.VITE_TELEGRAM_CHAT_ID as string | undefined;
+
+  if (!botToken || !chatId) {
+    throw new Error('Telegram bot token yoki chat id topilmadi (.env tekshiring)');
+  }
+
+  const lines = [
+    '🆕 <b>Yangi zayavka — Bravo Sayohat</b>',
+    `📞 Telefon: ${formData.phone || '—'}`,
+    `🌍 Yo'nalish: ${formData.destination || '—'}`,
+    `📅 Ketish sanasi: ${formData.departureDate || '—'}`,
+    `👥 Mehmonlar: ${formData.adults} kattalar${formData.children > 0 ? `, ${formData.children} bola` : ''}`,
+  ];
+  const text = lines.join('\n');
+
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Telegram API xatosi: ${response.status} ${errText}`);
+  }
+}
+
 export default function App() {
   const [route, setRoute] = useState<string>(window.location.hash);
 
@@ -55,7 +99,7 @@ export default function App() {
 function AdminRoute({ onExit }: { onExit: () => void }) {
   const { session, loading } = useAuth();
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#0a1b2b] text-white/50">Yuklanmoqda...</div>;
-  if (!session) return <AdminLogin onSuccess={() => {}} onBack={onExit} />;
+  if (!session) return <AdminLogin onSuccess={() => { }} onBack={onExit} />;
   return <AdminPanel onExit={onExit} />;
 }
 
@@ -221,6 +265,8 @@ function PublicSite() {
           submitError={submitError}
           onSubmit={async (formData) => {
             setSubmitError('');
+
+            // 1) Supabase'ga saqlab qo'yamiz (lead tarixi uchun)
             const { error } = await supabase.from('booking_requests').insert({
               full_name: 'Sayohat zayavkasi',
               phone: formData.phone,
@@ -234,18 +280,15 @@ function PublicSite() {
               setSubmitError('Xatolik yuz berdi. Iltimos, qaytadan urinib ko‘ring.');
               return;
             }
-            const { data: telegramResult, error: telegramError } = await supabase.functions.invoke('notify-telegram-lead', {
-              body: {
-                phone: formData.phone,
-                destination: formData.destination || null,
-                departureDate: formData.departureDate || null,
-                adults: formData.adults,
-                children: formData.children,
-              },
-            });
-            if (telegramError || telegramResult?.telegram === 'failed') {
+
+            // 2) Telegram botga to'g'ridan-to'g'ri yuboramiz (edge function shart emas)
+            try {
+              await sendTelegramLead(formData);
+            } catch (telegramError) {
+              console.error(telegramError);
               setSubmitError('Zayavka qabul qilindi, ammo operatorga Telegram orqali yuborishda xatolik yuz berdi.');
             }
+
             setSubmitted(true);
           }}
           onClose={() => setIsModalOpen(false)}
@@ -367,6 +410,7 @@ function BookingModal({
   const [adults, setAdults] = useState(initialAdults);
   const [children, setChildren] = useState(initialChildren);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => { setDestination(selectedDestination); }, [selectedDestination]);
   useEffect(() => { setDepartureDate(initialDepartureDate); }, [initialDepartureDate]);
@@ -390,7 +434,16 @@ function BookingModal({
             <h2 className="mt-3 max-w-sm font-serif text-4xl leading-tight text-[#10263b]">Orzuingizdagi sayohatni <em>boshlang.</em></h2>
             <p className="mt-4 text-sm leading-6 text-[#10263b]/60">Ma’lumotlaringizni qoldiring, shaxsiy maslahatchingiz 15 deqiqa ichida bog‘lanadi.</p>
             <form
-              onSubmit={(e) => { e.preventDefault(); onSubmit({ phone, destination, departureDate, adults, children }); }}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (isSubmitting) return;
+                setIsSubmitting(true);
+                try {
+                  await onSubmit({ phone, destination, departureDate, adults, children });
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
               className="mt-8 space-y-5"
             >
               <div className="grid gap-5 sm:grid-cols-2">
@@ -404,7 +457,9 @@ function BookingModal({
               <GuestPicker adults={adults} childrenCount={children} open={guestPickerOpen} onToggle={() => setGuestPickerOpen((open) => !open)} onAdultsChange={setAdults} onChildrenChange={setChildren} dark={false} />
               <label className="field">Telefon raqam<input required type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 90 000 00 00" autoFocus /></label>
               {submitError && <p className="rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-600">{submitError}</p>}
-              <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#10263b] py-4 text-sm font-bold uppercase tracking-[0.1em] text-white transition hover:bg-[#193853]">Zayavkani yuborish <ArrowUpRight size={17} /></button>
+              <button type="submit" disabled={isSubmitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#10263b] py-4 text-sm font-bold uppercase tracking-[0.1em] text-white transition hover:bg-[#193853] disabled:opacity-60">
+                {isSubmitting ? 'Yuborilmoqda...' : 'Zayavkani yuborish'} <ArrowUpRight size={17} />
+              </button>
             </form>
           </>
         )}
